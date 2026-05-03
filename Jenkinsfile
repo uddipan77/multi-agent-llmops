@@ -4,8 +4,8 @@ pipeline{
     environment {
         SONAR_PROJECT_KEY = 'LLMOPS'
 		SONAR_SCANNER_HOME = tool 'Sonarqube'
-        AWS_REGION = 'us-east-1'
-        ECR_REPO = 'my-repo'
+        AWS_REGION = 'eu-north-1'
+        ECR_REPO = 'multi-agent-llmops'
         IMAGE_TAG = 'latest'
 	}
 
@@ -14,7 +14,7 @@ pipeline{
             steps{
                 script{
                     echo 'Cloning Github repo to Jenkins............'
-                    checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[credentialsId: 'github-token', url: 'https://github.com/data-guru0/MULTI-AI-AGENT-PROJECTS.git']])
+                    checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[credentialsId: 'github-token', url: 'https://github.com/uddipan77/multi-agent-llmops.git']])
                 }
             }
         }
@@ -60,8 +60,8 @@ pipeline{
             script {
                 sh """
                 aws ecs update-service \
-                  --cluster multi-ai-agent-cluster \
-                  --service multi-ai-agent-def-service-shqlo39p  \
+                  --cluster multi-agent-cluster \
+                  --service multi-agent-service \
                   --force-new-deployment \
                   --region ${AWS_REGION}
                 """

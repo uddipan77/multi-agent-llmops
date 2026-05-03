@@ -1,7 +1,9 @@
 venv/
 MULTI_AI_AGENT.egg-info/
+*.egg-info/
 logs/
 .env
 __pycache__/
 *.pyc
 *.pyo
+.claude/

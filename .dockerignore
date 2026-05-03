@@ -1,0 +1,15 @@
+.git
+.gitignore
+.env
+venv/
+*.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+logs/
+.claude/
+README.md
+FULL_DOCUMENTATION.md
+*.png
+custom_jenkins/
+Jenkinsfile

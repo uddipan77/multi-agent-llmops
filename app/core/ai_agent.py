@@ -15,7 +15,7 @@ def get_response_from_ai_agents(llm_id , query , allow_search ,system_prompt):
     agent = create_react_agent(
         model=llm,
         tools=tools,
-        state_modifier=system_prompt
+        prompt=system_prompt
     )
 
     state = {"messages" : query}

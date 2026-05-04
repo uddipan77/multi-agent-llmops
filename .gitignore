@@ -7,4 +7,7 @@ __pycache__/
 *.pyc
 *.pyo
 .claude/
-explanation.md
+
+# Track only README.md among markdown files; everything else is local-only notes
+*.md
+!README.md

@@ -1,6 +1,13 @@
 # Multi-Agent LLMOps
 
-A production-ready multi-agent AI system powered by **Groq LLM** and **LangGraph**, with a complete **LLMOps pipeline** — from local development to automated deployment on **AWS ECS Fargate** via Jenkins CI/CD.
+A production-ready **multi-agent AI system** powered by **Groq LLM** and **LangGraph**, with a complete **LLMOps pipeline** — from local development to automated deployment on **AWS ECS Fargate** via Jenkins CI/CD.
+
+Three specialised agents collaborate per request:
+1. **Researcher** — gathers facts (uses Tavily web search when allowed; otherwise relies on LLM knowledge).
+2. **Writer** — synthesises a draft answer from the research notes, in the persona/style the user specifies.
+3. **Critic** — reviews the draft, decides `APPROVE` or `REVISE`. On `REVISE`, control flows back to the Writer with the critique attached. A max-iterations guard prevents runaway loops.
+
+The frontend surfaces both the final answer **and** the full per-agent trace, so you can see what each agent contributed.
 
 ---
 
@@ -8,14 +15,55 @@ A production-ready multi-agent AI system powered by **Groq LLM** and **LangGraph
 
 ![Multi AI Agent Workflow](assets/workflow.png)
 
-**Application layer** (single Docker container, two services):
+### Agent graph (LangGraph `StateGraph`)
+
+```
+                       ┌──────────────┐
+                       │    START     │
+                       └──────┬───────┘
+                              │
+                              ▼
+                  ┌────────────────────────┐
+                  │  1. Researcher Agent   │   ← LLM + Tavily search (optional)
+                  │  → research_notes      │
+                  └────────────┬───────────┘
+                               │
+                               ▼
+                  ┌────────────────────────┐
+                  │  2. Writer Agent       │   ← LLM, persona-aware
+                  │  → draft               │
+                  └────────────┬───────────┘
+                               │
+                               ▼
+                  ┌────────────────────────┐
+                  │  3. Critic Agent       │   ← LLM, returns
+                  │  → critique + verdict  │     ASSESSMENT + VERDICT
+                  └────────────┬───────────┘
+                               │
+                       ┌───────┴────────┐
+              VERDICT=REVISE      VERDICT=APPROVE
+              & iter ≤ MAX        OR iter > MAX
+                     │                  │
+                     ▼                  ▼
+              back to Writer       ┌─────────┐
+              (with critique)      │  END    │
+                                   │ (final_ │
+                                   │ answer) │
+                                   └─────────┘
+```
+
+State carried between nodes (`AgentState` TypedDict):
+`user_query`, `system_prompt`, `allow_search`, `model_name`, `research_notes`, `draft`, `critique`, `needs_revision`, `iteration`, `final_answer`.
+
+### System layout (single Docker container, two processes)
 
 | Component | Role |
 |---|---|
-| Streamlit UI (`:8501`) | Collects system prompt, model choice, query, web-search toggle |
-| FastAPI (`:9999`, internal) | Validates the request and dispatches to the agent |
-| LangGraph ReAct agent | Orchestrates LLM + optional Tavily search tool |
-| Groq LLM | Generates the response |
+| Streamlit UI (`:8501`) | Collects persona prompt, model choice, query, web-search toggle. Renders final answer + collapsible trace. |
+| FastAPI (`:9999`, internal) | Receives `POST /chat`, dispatches to the agent graph, returns `{response, trace}`. |
+| LangGraph `StateGraph` | Orchestrates Researcher → Writer → Critic with conditional edges. |
+| Groq LLM | Same `llama-3.3-70b-versatile` model invoked across all three agent roles. |
+| Tavily | Web-search tool plugged into the Researcher's ReAct loop only when `allow_search=true`. |
 
 The Streamlit container talks to FastAPI on `127.0.0.1:9999` inside the container; only `8501` is exposed externally.
 
@@ -39,8 +87,8 @@ git push  →  Jenkins (Docker-in-Docker, WSL)
 | Layer | Technology |
 |---|---|
 | LLM | Groq (`llama-3.3-70b-versatile`) |
-| Agent framework | LangGraph (ReAct), LangChain |
-| Web search tool | Tavily |
+| Agent framework | LangGraph `StateGraph` (multi-agent), `create_react_agent` for the Researcher, LangChain |
+| Web search tool | Tavily (Researcher only, when toggled on) |
 | Backend API | FastAPI + Uvicorn |
 | Frontend UI | Streamlit |
 | Containerization | Docker |
@@ -126,10 +174,12 @@ docker run -d --name multi-agent \
 
 ### Using the app
 
-1. **Define your AI Agent** — system prompt (e.g. *"You are a concise research assistant"*).
+1. **Persona / style for the Writer agent** — e.g. *"You are a concise research assistant"*.
 2. **Select model** — `llama-3.3-70b-versatile`.
-3. **Allow web search** — tick to enable Tavily.
-4. **Enter query** → **Ask Agent**.
+3. **Allow web search (Tavily) for the Researcher agent** — tick to enable live search.
+4. **Enter query** → **Ask Agents**.
+
+The page shows the **Final Answer** at the top, plus an expandable **agent reasoning trace** with the Researcher's notes, the Writer's draft, and the Critic's verdict.
 
 ---
 

@@ -25,21 +25,29 @@ def chat_endpoint(request:RequestState):
         raise HTTPException(status_code=400 , detail="Invalid model name")
     
     try:
-        response = get_response_from_ai_agents(
+        result = get_response_from_ai_agents(
             request.model_name,
             request.messages,
             request.allow_search,
             request.system_prompt
         )
 
-        logger.info(f"Sucesfully got response from AI Agent {request.model_name}")
+        logger.info(f"Sucesfully got response from multi-agent pipeline ({result.get('iterations')} writer iteration(s))")
 
-        return {"response" : response}
-    
+        return {
+            "response": result["final_answer"],
+            "trace": {
+                "research_notes": result.get("research_notes", ""),
+                "draft": result.get("draft", ""),
+                "critique": result.get("critique", ""),
+                "iterations": result.get("iterations", 0),
+            },
+        }
+
     except Exception as e:
         logger.error("Some error ocuured during reponse generation")
         raise HTTPException(
-            status_code=500 , 
+            status_code=500 ,
             detail=str(CustomException("Failed to get AI response" , error_detail=e))
             )
     
